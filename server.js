@@ -17,9 +17,6 @@ const io = new Server(server, {
 let rooms = {};
 
 io.on('connection', (socket) => {
-    console.log('User connected:', socket.id);
-
-    // Kirim daftar room publik ke user yang baru konek
     socket.emit('update-room-list', Object.values(rooms).filter(r => !r.isPrivate && r.players.length < 2));
 
     socket.on('create-room', ({ playerName, isPrivate }) => {
@@ -28,8 +25,7 @@ io.on('connection', (socket) => {
             code: roomCode,
             ownerId: socket.id,
             players: [{ id: socket.id, name: playerName, move: null }],
-            isPrivate: isPrivate,
-            status: 'waiting'
+            isPrivate: isPrivate
         };
         socket.join(roomCode);
         socket.emit('room-created', rooms[roomCode]);
@@ -41,10 +37,7 @@ io.on('connection', (socket) => {
         if (room && room.players.length < 2) {
             room.players.push({ id: socket.id, name: playerName, move: null });
             socket.join(roomCode);
-            
-            // Notifikasi ke owner
-            io.to(room.ownerId).emit('notification', `${playerName} bergabung ke room!`);
-            
+            io.to(room.ownerId).emit('notification', `${playerName} bergabung!`);
             io.to(roomCode).emit('player-joined', room);
             io.emit('update-room-list', Object.values(rooms).filter(r => !r.isPrivate && r.players.length < 2));
         } else {
@@ -57,12 +50,19 @@ io.on('connection', (socket) => {
         if (!room) return;
 
         const player = room.players.find(p => p.id === socket.id);
-        if (player) player.move = move;
+        if (player) {
+            player.move = move;
+            // Beritahu lawan bahwa player ini sudah memilih
+            socket.to(roomCode).emit('opponent-has-moved');
+        }
 
-        // Cek jika kedua pemain sudah pilih
-        if (room.players.length === 2 && room.players[0].move && room.players[1].move) {
+        // Cek jika semua (2 orang) sudah pilih
+        const readyPlayers = room.players.filter(p => p.move !== null);
+        if (readyPlayers.length === 2) {
+            // Kirim hasil ke semua orang di room tersebut
             io.to(roomCode).emit('game-result', room.players);
-            // Reset move
+            
+            // Reset move untuk ronde berikutnya
             room.players.forEach(p => p.move = null);
         }
     });
@@ -78,14 +78,16 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         for (const code in rooms) {
-            rooms[code].players = rooms[code].players.filter(p => p.id !== socket.id);
-            if (rooms[code].players.length === 0) {
-                delete rooms[code];
-            } else {
-                if (rooms[code].ownerId === socket.id) {
-                    rooms[code].ownerId = rooms[code].players[0].id;
+            const room = rooms[code];
+            const playerIndex = room.players.findIndex(p => p.id === socket.id);
+            if (playerIndex !== -1) {
+                room.players.splice(playerIndex, 1);
+                if (room.players.length === 0) {
+                    delete rooms[code];
+                } else {
+                    if (room.ownerId === socket.id) room.ownerId = room.players[0].id;
+                    io.to(code).emit('player-joined', room);
                 }
-                io.to(code).emit('player-joined', rooms[code]);
             }
         }
         io.emit('update-room-list', Object.values(rooms).filter(r => !r.isPrivate && r.players.length < 2));
