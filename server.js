@@ -3,19 +3,26 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const cors = require('cors');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+    cors: { origin: "*" }
+});
 
+// Setting EJS
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
+
+// Path untuk file statis (CSS/JS jika ada)
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/', (req, res) => {
     res.render('index');
 });
 
+// --- LOGIKA GAME (Sama seperti sebelumnya) ---
 let rooms = {};
 
 io.on('connection', (socket) => {
@@ -26,8 +33,7 @@ io.on('connection', (socket) => {
         rooms[roomCode] = {
             code: roomCode,
             ownerId: socket.id,
-            players: [{ id: socket.id, name: playerName, move: null, score: 0 }],
-            status: 'waiting'
+            players: [{ id: socket.id, name: playerName, move: null, score: 0 }]
         };
         socket.join(roomCode);
         socket.emit('room-created', rooms[roomCode]);
@@ -39,7 +45,6 @@ io.on('connection', (socket) => {
         if (room && room.players.length < 2) {
             room.players.push({ id: socket.id, name: playerName, move: null, score: 0 });
             socket.join(roomCode);
-            io.to(room.ownerId).emit('notification', `${playerName} joined!`);
             io.to(roomCode).emit('player-joined', room);
             io.emit('update-room-list', Object.values(rooms).filter(r => r.players.length < 2));
         } else {
@@ -50,28 +55,19 @@ io.on('connection', (socket) => {
     socket.on('make-move', ({ roomCode, move }) => {
         const room = rooms[roomCode];
         if (!room) return;
-
         const pIdx = room.players.findIndex(p => p.id === socket.id);
         if (pIdx !== -1) {
             room.players[pIdx].move = move;
             socket.to(roomCode).emit('opponent-moved');
         }
-
         if (room.players.length === 2 && room.players[0].move && room.players[1].move) {
             const p1 = room.players[0];
             const p2 = room.players[1];
-
-            // Logic Win
             if (p1.move !== p2.move) {
-                if (
-                    (p1.move === 'rock' && p2.move === 'scissors') ||
-                    (p1.move === 'paper' && p2.move === 'rock') ||
-                    (p1.move === 'scissors' && p2.move === 'paper')
-                ) { p1.score++; } else { p2.score++; }
+                if ((p1.move === 'rock' && p2.move === 'scissors') || (p1.move === 'paper' && p2.move === 'rock') || (p1.move === 'scissors' && p2.move === 'paper')) 
+                { p1.score++; } else { p2.score++; }
             }
-            
             io.to(roomCode).emit('game-result', { players: room.players });
-            // Reset moves
             room.players.forEach(p => p.move = null);
         }
     });
@@ -93,12 +89,8 @@ io.on('connection', (socket) => {
         for (const code in rooms) {
             const room = rooms[code];
             room.players = room.players.filter(p => p.id !== socket.id);
-            if (room.players.length === 0) {
-                delete rooms[code];
-            } else {
-                if (room.ownerId === socket.id) room.ownerId = room.players[0].id;
-                io.to(code).emit('player-joined', room);
-            }
+            if (room.players.length === 0) delete rooms[code];
+            else io.to(code).emit('player-joined', room);
         }
         io.emit('update-room-list', Object.values(rooms).filter(r => r.players.length < 2));
     });
