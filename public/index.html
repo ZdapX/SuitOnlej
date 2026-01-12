@@ -3,83 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Suit Online - Modern Game</title>
+    <title>Suit Online - Fix</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/socket.io/socket.io.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
-        .card { background: white; border: 1px solid #e2e8f0; border-radius: 16px; transition: all 0.2s; }
-        .btn-primary { background-color: #4f46e5; color: white; padding: 12px 24px; border-radius: 12px; font-weight: 600; }
-        .btn-primary:hover { background-color: #4338ca; }
-        .hand-icon { font-size: 3rem; cursor: pointer; transition: transform 0.2s; padding: 20px; border-radius: 20px; background: #f1f5f9; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; color: #1e293b; }
+        .card { background: white; border: 1px solid #e2e8f0; border-radius: 16px; }
+        .btn-primary { background-color: #4f46e5; color: white; padding: 12px 24px; border-radius: 12px; font-weight: 600; transition: 0.2s; }
+        .btn-primary:disabled { background-color: #94a3b8; cursor: not-allowed; }
+        .hand-icon { font-size: 3rem; cursor: pointer; transition: 0.2s; padding: 20px; border-radius: 20px; background: #f1f5f9; border: 2px solid transparent; }
         .hand-icon:hover { transform: translateY(-5px); background: #e2e8f0; }
+        .hand-icon.selected { border-color: #4f46e5; background: #eef2ff; }
         .hidden { display: none; }
     </style>
 </head>
 <body class="p-6">
 
     <div id="app" class="max-w-md mx-auto">
-        <!-- Input Nama -->
+        <!-- Screen 1: Name -->
         <div id="name-screen" class="space-y-6">
-            <h1 class="text-3xl font-extrabold text-slate-900">Suit Online ✌️</h1>
-            <div class="card p-6">
+            <h1 class="text-3xl font-extrabold">Suit Online ✌️</h1>
+            <div class="card p-6 shadow-sm">
                 <label class="block text-sm font-semibold mb-2">Nama Player</label>
-                <input type="text" id="player-name" class="w-full border p-3 rounded-xl mb-4 outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Masukkan nama...">
-                <button onclick="saveName()" class="w-full btn-primary shadow-lg shadow-indigo-200">Simpan & Lanjut</button>
+                <input type="text" id="player-name" class="w-full border p-3 rounded-xl mb-4 outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Contoh: Budi">
+                <button onclick="saveName()" class="w-full btn-primary">Masuk ke Lobby</button>
             </div>
         </div>
 
-        <!-- Lobby -->
+        <!-- Screen 2: Lobby -->
         <div id="lobby-screen" class="hidden space-y-6">
             <div class="flex justify-between items-center">
-                <h2 id="welcome-text" class="text-xl font-bold">Halo, Player</h2>
-                <button onclick="logout()" class="text-red-500 text-sm">Ganti Nama</button>
+                <h2 id="welcome-text" class="text-xl font-bold italic"></h2>
+                <button onclick="logout()" class="text-red-500 font-medium text-sm">Ganti Nama</button>
             </div>
 
             <div class="grid grid-cols-2 gap-4">
-                <button onclick="createRoom()" class="card p-4 text-center hover:border-indigo-500">
+                <button onclick="createRoom()" class="card p-5 text-center hover:border-indigo-500 transition">
                     <span class="block text-2xl mb-1">➕</span>
                     <span class="font-bold">Buat Room</span>
                 </button>
-                <button onclick="showJoinModal()" class="card p-4 text-center hover:border-indigo-500">
+                <button onclick="showJoinModal()" class="card p-5 text-center hover:border-indigo-500 transition">
                     <span class="block text-2xl mb-1">🔑</span>
                     <span class="font-bold">Join Code</span>
                 </button>
             </div>
 
-            <div>
-                <h3 class="font-bold text-slate-700 mb-3">Room Publik</h3>
-                <div id="public-rooms" class="space-y-3">
-                    <!-- List room di sini -->
-                </div>
-            </div>
+            <h3 class="font-bold text-slate-700">Room Publik</h3>
+            <div id="public-rooms" class="space-y-3"></div>
         </div>
 
-        <!-- Game Room -->
+        <!-- Screen 3: Game -->
         <div id="game-screen" class="hidden space-y-6">
-            <div class="card p-4 flex justify-between items-center bg-indigo-50 border-indigo-100">
+            <div class="card p-4 flex justify-between items-center bg-white shadow-sm">
                 <div>
-                    <p class="text-xs uppercase font-bold text-indigo-400 leading-none">Room Code</p>
-                    <p id="display-room-code" class="text-lg font-extrabold text-indigo-900"></p>
+                    <p class="text-[10px] uppercase font-bold text-slate-400">Room Code</p>
+                    <p id="display-room-code" class="text-lg font-black text-indigo-600"></p>
                 </div>
-                <button onclick="exitRoom()" class="text-sm bg-white px-3 py-1 rounded-lg border">Keluar</button>
+                <button onclick="exitRoom()" class="text-sm font-bold text-slate-500 hover:text-red-500">Keluar</button>
             </div>
 
-            <div id="opponent-info" class="card p-4 text-center italic text-slate-500">
-                Menunggu lawan bergabung...
-            </div>
+            <div id="player-list-admin"></div>
 
-            <div id="player-list-admin" class="space-y-2"></div>
-
-            <div id="game-area" class="card p-8 text-center hidden">
-                <p class="mb-6 font-bold text-slate-700">Pilih Senjata Kamu:</p>
-                <div class="flex justify-center gap-4">
-                    <div onclick="sendMove('rock')" class="hand-icon">✊</div>
-                    <div onclick="sendMove('paper')" class="hand-icon">🖐️</div>
-                    <div onclick="sendMove('scissors')" class="hand-icon">✌️</div>
+            <div id="game-area" class="card p-8 text-center shadow-lg">
+                <div id="opponent-status" class="mb-4 text-sm font-medium text-amber-600 bg-amber-50 py-1 px-3 rounded-full inline-block">
+                    Menunggu lawan...
                 </div>
-                <p id="move-status" class="mt-6 text-indigo-600 font-semibold"></p>
+                
+                <div id="weapon-choices" class="flex justify-center gap-4 mt-4">
+                    <button onclick="sendMove('rock')" class="hand-icon" id="btn-rock">✊</button>
+                    <button onclick="sendMove('paper')" class="hand-icon" id="btn-paper">🖐️</button>
+                    <button onclick="sendMove('scissors')" class="hand-icon" id="btn-scissors">✌️</button>
+                </div>
+                <p id="move-status" class="mt-6 font-bold text-indigo-600"></p>
             </div>
         </div>
     </div>
@@ -105,7 +101,7 @@
         function showLobby() {
             document.getElementById('name-screen').classList.add('hidden');
             document.getElementById('lobby-screen').classList.remove('hidden');
-            document.getElementById('welcome-text').innerText = `Halo, ${myName}`;
+            document.getElementById('welcome-text').innerText = `Halo, ${myName}!`;
         }
 
         function logout() {
@@ -128,7 +124,14 @@
 
         function sendMove(move) {
             socket.emit('make-move', { roomCode: currentRoom.code, move });
-            document.getElementById('move-status').innerText = "Menunggu lawan...";
+            
+            // Disable buttons agar tidak spam
+            document.querySelectorAll('.hand-icon').forEach(btn => {
+                btn.onclick = null;
+                btn.style.opacity = "0.5";
+            });
+            document.getElementById('btn-' + move).classList.add('selected');
+            document.getElementById('move-status').innerText = "Kamu sudah memilih. Tunggu lawan...";
         }
 
         socket.on('room-created', (room) => {
@@ -140,76 +143,91 @@
             currentRoom = room;
             openRoom();
             const opponent = room.players.find(p => p.id !== socket.id);
-            if (opponent) {
-                document.getElementById('opponent-info').innerHTML = `Lawan: <b>${opponent.name}</b>`;
-                document.getElementById('game-area').classList.remove('hidden');
-            }
             
-            // Render list untuk admin (kick button)
-            const adminArea = document.getElementById('player-list-admin');
-            adminArea.innerHTML = '';
-            if (room.ownerId === socket.id) {
-                room.players.forEach(p => {
-                    if (p.id !== socket.id) {
-                        adminArea.innerHTML = `<div class="flex justify-between items-center p-2 bg-white rounded-lg border border-red-100">
-                            <span class="text-sm font-bold">${p.name} (Lawan)</span>
-                            <button onclick="kickPlayer('${p.id}')" class="text-xs bg-red-500 text-white px-2 py-1 rounded">Tendang</button>
-                        </div>`;
-                    }
-                });
+            if (opponent) {
+                document.getElementById('opponent-status').innerText = `Lawan: ${opponent.name} (Sedang memilih...)`;
+                
+                // Render Kick Button jika saya adalah Owner
+                const adminArea = document.getElementById('player-list-admin');
+                adminArea.innerHTML = '';
+                if (room.ownerId === socket.id) {
+                    adminArea.innerHTML = `
+                        <div class="flex justify-between items-center p-3 bg-white border rounded-xl mb-4">
+                            <span class="text-sm font-bold text-slate-600">Lawan: ${opponent.name}</span>
+                            <button onclick="kickPlayer('${opponent.id}')" class="text-xs font-bold text-red-500 border border-red-200 px-3 py-1 rounded-lg hover:bg-red-50">TENDANG</button>
+                        </div>
+                    `;
+                }
             }
         });
+
+        // NOTIFIKASI: Lawan sudah klik senjata
+        socket.on('opponent-has-moved', () => {
+            document.getElementById('opponent-status').innerText = "Lawan SUDAH memilih! Cepat pilih!";
+            document.getElementById('opponent-status').classList.replace('text-amber-600', 'text-green-600');
+            document.getElementById('opponent-status').classList.replace('bg-amber-50', 'bg-green-50');
+        });
+
+        socket.on('game-result', (players) => {
+            const myData = players.find(p => p.id === socket.id);
+            const oppData = players.find(p => p.id !== socket.id);
+            
+            const emoji = {rock: '✊', paper: '🖐️', scissors: '✌️'};
+            let resultText = "";
+
+            if (myData.move === oppData.move) resultText = "SERI! 🤝";
+            else if (
+                (myData.move === 'rock' && oppData.move === 'scissors') ||
+                (myData.move === 'paper' && oppData.move === 'rock') ||
+                (myData.move === 'scissors' && oppData.move === 'paper')
+            ) resultText = "KAMU MENANG! 🎉";
+            else resultText = "KAMU KALAH! 💀";
+
+            setTimeout(() => {
+                alert(`HASIL PERTANDINGAN:\n\nKamu: ${emoji[myData.move]}\nLawan: ${emoji[oppData.move]}\n\n${resultText}`);
+                resetUI();
+            }, 500);
+        });
+
+        function resetUI() {
+            // Reset tombol senjata agar bisa diklik lagi
+            document.getElementById('move-status').innerText = "";
+            document.getElementById('opponent-status').innerText = "Lawan sedang memilih...";
+            document.getElementById('opponent-status').className = "mb-4 text-sm font-medium text-amber-600 bg-amber-50 py-1 px-3 rounded-full inline-block";
+            
+            const weapons = ['rock', 'paper', 'scissors'];
+            weapons.forEach(w => {
+                const btn = document.getElementById('btn-' + w);
+                btn.onclick = () => sendMove(w);
+                btn.style.opacity = "1";
+                btn.classList.remove('selected');
+            });
+        }
 
         function kickPlayer(pid) {
             socket.emit('kick-player', { roomCode: currentRoom.code, playerId: pid });
         }
 
         socket.on('kicked', () => {
-            alert("Kamu dikeluarkan dari room oleh pemilik.");
+            alert("Kamu dikeluarkan dari room.");
             location.reload();
-        });
-
-        socket.on('game-result', (players) => {
-            const myMove = players.find(p => p.id === socket.id).move;
-            const opp = players.find(p => p.id !== socket.id);
-            const oppMove = opp.move;
-            
-            let result = "";
-            const emoji = {rock: '✊', paper: '🖐️', scissors: '✌️'};
-
-            if (myMove === oppMove) result = "Seri! 🤝";
-            else if (
-                (myMove === 'rock' && oppMove === 'scissors') ||
-                (myMove === 'paper' && oppMove === 'rock') ||
-                (myMove === 'scissors' && oppMove === 'paper')
-            ) result = "Kamu Menang! 🎉";
-            else result = "Kamu Kalah! 💀";
-
-            alert(`Lawan memilih ${emoji[oppMove]}\n${result}`);
-            document.getElementById('move-status').innerText = "";
-        });
-
-        socket.on('notification', (msg) => {
-            alert(msg);
         });
 
         socket.on('update-room-list', (rooms) => {
             const container = document.getElementById('public-rooms');
-            container.innerHTML = rooms.length ? '' : '<p class="text-slate-400 text-sm">Tidak ada room publik aktif.</p>';
+            container.innerHTML = rooms.length ? '' : '<p class="text-slate-400 text-sm italic">Belum ada room publik...</p>';
             rooms.forEach(r => {
                 container.innerHTML += `
-                    <div class="card p-4 flex justify-between items-center">
+                    <div class="card p-4 flex justify-between items-center shadow-sm">
                         <div>
-                            <p class="font-bold">${r.code}</p>
-                            <p class="text-xs text-slate-500">Player: ${r.players[0].name}</p>
+                            <p class="font-bold text-indigo-600">${r.code}</p>
+                            <p class="text-xs text-slate-500 font-medium">Host: ${r.players[0].name}</p>
                         </div>
-                        <button onclick="joinRoom('${r.code}')" class="bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-xl text-sm font-bold">Join</button>
+                        <button onclick="joinRoom('${r.code}')" class="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-xl text-sm font-bold hover:bg-indigo-600 hover:text-white transition">Masuk</button>
                     </div>
                 `;
             });
         });
-
-        socket.on('error-msg', (msg) => alert(msg));
 
         function openRoom() {
             document.getElementById('lobby-screen').classList.add('hidden');
@@ -217,9 +235,9 @@
             document.getElementById('display-room-code').innerText = currentRoom.code;
         }
 
-        function exitRoom() {
-            location.reload();
-        }
+        function exitRoom() { location.reload(); }
+        socket.on('notification', (msg) => alert(msg));
+        socket.on('error-msg', (msg) => alert(msg));
     </script>
 </body>
 </html>
