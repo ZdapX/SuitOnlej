@@ -3,43 +3,45 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-const cors = require('cors');
 
 const app = express();
-app.use(cors());
+const server = http.createServer(app);
+const io = new Server(server);
+
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
 
-const server = http.createServer(app);
-const io = new Server(server, {
-    cors: { origin: "*" }
+app.get('/', (req, res) => {
+    res.render('index');
 });
 
 let rooms = {};
 
 io.on('connection', (socket) => {
-    socket.emit('update-room-list', Object.values(rooms).filter(r => !r.isPrivate && r.players.length < 2));
+    socket.emit('update-room-list', Object.values(rooms).filter(r => r.players.length < 2));
 
-    socket.on('create-room', ({ playerName, isPrivate }) => {
+    socket.on('create-room', ({ playerName }) => {
         const roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
         rooms[roomCode] = {
             code: roomCode,
             ownerId: socket.id,
-            players: [{ id: socket.id, name: playerName, move: null }],
-            isPrivate: isPrivate
+            players: [{ id: socket.id, name: playerName, move: null, score: 0 }],
+            status: 'waiting'
         };
         socket.join(roomCode);
         socket.emit('room-created', rooms[roomCode]);
-        io.emit('update-room-list', Object.values(rooms).filter(r => !r.isPrivate && r.players.length < 2));
+        io.emit('update-room-list', Object.values(rooms).filter(r => r.players.length < 2));
     });
 
     socket.on('join-room', ({ playerName, roomCode }) => {
         const room = rooms[roomCode];
         if (room && room.players.length < 2) {
-            room.players.push({ id: socket.id, name: playerName, move: null });
+            room.players.push({ id: socket.id, name: playerName, move: null, score: 0 });
             socket.join(roomCode);
-            io.to(room.ownerId).emit('notification', `${playerName} bergabung!`);
+            io.to(room.ownerId).emit('notification', `${playerName} joined!`);
             io.to(roomCode).emit('player-joined', room);
-            io.emit('update-room-list', Object.values(rooms).filter(r => !r.isPrivate && r.players.length < 2));
+            io.emit('update-room-list', Object.values(rooms).filter(r => r.players.length < 2));
         } else {
             socket.emit('error-msg', 'Room penuh atau tidak ditemukan');
         }
@@ -49,22 +51,33 @@ io.on('connection', (socket) => {
         const room = rooms[roomCode];
         if (!room) return;
 
-        const player = room.players.find(p => p.id === socket.id);
-        if (player) {
-            player.move = move;
-            // Beritahu lawan bahwa player ini sudah memilih
-            socket.to(roomCode).emit('opponent-has-moved');
+        const pIdx = room.players.findIndex(p => p.id === socket.id);
+        if (pIdx !== -1) {
+            room.players[pIdx].move = move;
+            socket.to(roomCode).emit('opponent-moved');
         }
 
-        // Cek jika semua (2 orang) sudah pilih
-        const readyPlayers = room.players.filter(p => p.move !== null);
-        if (readyPlayers.length === 2) {
-            // Kirim hasil ke semua orang di room tersebut
-            io.to(roomCode).emit('game-result', room.players);
+        if (room.players.length === 2 && room.players[0].move && room.players[1].move) {
+            const p1 = room.players[0];
+            const p2 = room.players[1];
+
+            // Logic Win
+            if (p1.move !== p2.move) {
+                if (
+                    (p1.move === 'rock' && p2.move === 'scissors') ||
+                    (p1.move === 'paper' && p2.move === 'rock') ||
+                    (p1.move === 'scissors' && p2.move === 'paper')
+                ) { p1.score++; } else { p2.score++; }
+            }
             
-            // Reset move untuk ronde berikutnya
+            io.to(roomCode).emit('game-result', { players: room.players });
+            // Reset moves
             room.players.forEach(p => p.move = null);
         }
+    });
+
+    socket.on('send-chat', ({ roomCode, message, sender }) => {
+        io.to(roomCode).emit('receive-chat', { message, sender });
     });
 
     socket.on('kick-player', ({ roomCode, playerId }) => {
@@ -79,18 +92,15 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         for (const code in rooms) {
             const room = rooms[code];
-            const playerIndex = room.players.findIndex(p => p.id === socket.id);
-            if (playerIndex !== -1) {
-                room.players.splice(playerIndex, 1);
-                if (room.players.length === 0) {
-                    delete rooms[code];
-                } else {
-                    if (room.ownerId === socket.id) room.ownerId = room.players[0].id;
-                    io.to(code).emit('player-joined', room);
-                }
+            room.players = room.players.filter(p => p.id !== socket.id);
+            if (room.players.length === 0) {
+                delete rooms[code];
+            } else {
+                if (room.ownerId === socket.id) room.ownerId = room.players[0].id;
+                io.to(code).emit('player-joined', room);
             }
         }
-        io.emit('update-room-list', Object.values(rooms).filter(r => !r.isPrivate && r.players.length < 2));
+        io.emit('update-room-list', Object.values(rooms).filter(r => r.players.length < 2));
     });
 });
 
