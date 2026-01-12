@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Suit Online - Fix & Pro</title>
+    <title>Suit Online Modern</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/socket.io/socket.io.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; color: #1e293b; }
-        .card { background: white; border-radius: 24px; border: 1px solid #e2e8f0; }
-        .hand-btn { font-size: 2.5rem; padding: 1.5rem; background: #f1f5f9; border-radius: 20px; transition: 0.2s; border: 2px solid transparent; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
+        .card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 20px; }
+        .hand-btn { font-size: 2.5rem; background: #f1f5f9; padding: 1.5rem; border-radius: 20px; transition: 0.2s; border: 2px solid transparent; }
         .hand-btn:hover:not(:disabled) { transform: translateY(-5px); background: #e2e8f0; }
         .hand-btn.selected { border-color: #4f46e5; background: #eef2ff; }
-        .chat-area { height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+        .chat-msg { margin-bottom: 8px; font-size: 13px; }
         .hidden { display: none; }
     </style>
 </head>
@@ -21,163 +21,165 @@
 
     <div id="app" class="max-w-md mx-auto">
         <!-- Input Nama -->
-        <div id="name-screen" class="mt-10 space-y-6">
-            <h1 class="text-4xl font-extrabold text-slate-900">Suit <span class="text-indigo-600">Pro.</span></h1>
+        <div id="screen-name" class="mt-20">
+            <h1 class="text-3xl font-extrabold text-slate-900 mb-6">Suit <span class="text-indigo-600">Online.</span></h1>
             <div class="card p-6 shadow-sm">
-                <input type="text" id="player-name" class="w-full border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-indigo-500 mb-4 font-bold" placeholder="Nama Kamu...">
-                <button onclick="saveName()" class="w-full bg-indigo-600 text-white font-bold p-4 rounded-2xl shadow-lg">Masuk Game</button>
+                <p class="text-xs font-bold text-slate-400 mb-2 uppercase">Nama Player</p>
+                <input type="text" id="input-name" class="w-full p-4 border rounded-xl mb-4 font-bold outline-none focus:border-indigo-500" placeholder="Contoh: Budi">
+                <button onclick="saveName()" class="w-full bg-indigo-600 text-white font-bold p-4 rounded-xl shadow-lg shadow-indigo-100">Lanjut</button>
             </div>
         </div>
 
         <!-- Lobby -->
-        <div id="lobby-screen" class="hidden space-y-6">
-            <div class="flex justify-between items-center py-4">
-                <h2 class="text-xl font-bold" id="welcome-user">Halo!</h2>
-                <button onclick="logout()" class="text-red-500 font-bold text-sm">Logout</button>
+        <div id="screen-lobby" class="hidden">
+            <div class="flex justify-between items-center py-6">
+                <h2 id="welcome-text" class="text-xl font-bold">Halo!</h2>
+                <button onclick="logout()" class="text-red-500 text-xs font-bold">Ganti Nama</button>
             </div>
-            <div class="grid grid-cols-2 gap-4">
-                <button onclick="createRoom()" class="card p-6 text-center hover:border-indigo-500 transition-all">
-                    <span class="block text-2xl mb-1">🎮</span>
-                    <span class="font-bold">Buat Room</span>
+            
+            <div class="grid grid-cols-2 gap-4 mb-8">
+                <button onclick="createRoom()" class="card p-6 text-center hover:border-indigo-500">
+                    <span class="block text-2xl mb-2">➕</span>
+                    <span class="font-bold text-sm">Buat Room</span>
                 </button>
-                <button onclick="joinByCode()" class="card p-6 text-center hover:border-indigo-500 transition-all">
-                    <span class="block text-2xl mb-1">🔑</span>
-                    <span class="font-bold">Ikut Teman</span>
+                <button onclick="joinByCode()" class="card p-6 text-center hover:border-indigo-500">
+                    <span class="block text-2xl mb-2">🔑</span>
+                    <span class="font-bold text-sm">Kode Room</span>
                 </button>
             </div>
-            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest">Room Publik</h3>
-            <div id="room-list" class="space-y-3"></div>
+
+            <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Room Publik Aktif</h3>
+            <div id="list-rooms" class="space-y-3"></div>
         </div>
 
-        <!-- Game Screen -->
-        <div id="game-screen" class="hidden space-y-4">
-            <!-- Scoreboard -->
-            <div class="card p-4 bg-slate-900 text-white flex justify-between items-center shadow-xl">
+        <!-- Game -->
+        <div id="screen-game" class="hidden space-y-4">
+            <!-- Score -->
+            <div class="card bg-slate-900 p-4 flex justify-between items-center text-white">
                 <div class="text-center flex-1">
-                    <p class="text-[10px] opacity-60 font-bold">KAMU</p>
-                    <p id="my-score" class="text-2xl font-black">0</p>
+                    <p class="text-[9px] font-bold opacity-50 uppercase">Kamu</p>
+                    <p id="score-me" class="text-2xl font-black">0</p>
                 </div>
-                <div class="text-indigo-400 font-black text-xl mx-4">VS</div>
+                <div class="font-bold text-indigo-400">VS</div>
                 <div class="text-center flex-1">
-                    <p class="text-[10px] opacity-60 font-bold uppercase" id="opp-name">LAWAN</p>
-                    <p id="opp-score" class="text-2xl font-black">0</p>
+                    <p class="text-[9px] font-bold opacity-50 uppercase" id="name-opp">Lawan</p>
+                    <p id="score-opp" class="text-2xl font-black">0</p>
                 </div>
             </div>
 
-            <!-- Area Suit -->
+            <!-- Game Area -->
             <div class="card p-8 text-center shadow-sm">
-                <div id="status-pill" class="inline-block px-4 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold mb-6">
-                    Menunggu lawan bergabung...
+                <div id="game-pill" class="inline-block px-4 py-1 rounded-full bg-slate-100 text-slate-500 text-[10px] font-bold mb-6">
+                    Menunggu lawan...
                 </div>
-                
-                <div class="flex justify-center gap-4">
+
+                <div class="flex justify-center gap-4 mb-6">
                     <button id="btn-rock" onclick="play('rock')" class="hand-btn">✊</button>
                     <button id="btn-paper" onclick="play('paper')" class="hand-btn">🖐️</button>
                     <button id="btn-scissors" onclick="play('scissors')" class="hand-btn">✌️</button>
                 </div>
-                <p id="move-info" class="mt-6 text-sm font-bold text-indigo-600 h-5"></p>
+                <p id="status-text" class="text-sm font-bold text-indigo-600 h-4"></p>
 
-                <div id="admin-area" class="mt-6 pt-4 border-t hidden"></div>
+                <div id="admin-kick" class="mt-6 pt-4 border-t hidden"></div>
             </div>
 
-            <!-- Chat Pro -->
-            <div class="card p-4 shadow-sm bg-white">
-                <div id="chat-content" class="chat-area mb-3 text-sm"></div>
+            <!-- Chat -->
+            <div class="card p-4 shadow-sm">
+                <div id="box-chat" class="h-32 overflow-y-auto mb-3 flex flex-col gap-2"></div>
                 <div class="flex gap-2">
-                    <input type="text" id="chat-msg" class="flex-1 bg-slate-50 p-2 rounded-xl outline-none text-sm" placeholder="Kirim pesan...">
-                    <button onclick="sendChat()" class="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold">Kirim</button>
+                    <input type="text" id="input-chat" class="flex-1 bg-slate-50 p-2 rounded-xl text-sm outline-none" placeholder="Ketik pesan...">
+                    <button onclick="sendChat()" class="bg-indigo-600 text-white px-4 rounded-xl text-xs font-bold">Kirim</button>
                 </div>
             </div>
 
-            <button onclick="location.reload()" class="w-full text-slate-400 text-xs font-bold">KELUAR ROOM</button>
+            <button onclick="location.reload()" class="w-full text-slate-400 text-[10px] font-bold py-4">EXIT GAME</button>
         </div>
     </div>
 
     <script>
         const socket = io();
         let myName = localStorage.getItem('suit-name');
-        let currentRoomCode = null;
+        let currentRoom = null;
 
-        if(myName) showLobby();
+        if (myName) showLobby();
 
         function saveName() {
-            const val = document.getElementById('player-name').value;
-            if(!val) return alert("Isi nama!");
-            localStorage.setItem('suit-name', val);
-            myName = val;
+            const name = document.getElementById('input-name').value;
+            if (!name) return alert("Nama wajib diisi!");
+            localStorage.setItem('suit-name', name);
+            myName = name;
             showLobby();
         }
 
         function showLobby() {
-            document.getElementById('name-screen').classList.add('hidden');
-            document.getElementById('lobby-screen').classList.remove('hidden');
-            document.getElementById('welcome-user').innerText = `Halo, ${myName}!`;
+            document.getElementById('screen-name').classList.add('hidden');
+            document.getElementById('screen-lobby').classList.remove('hidden');
+            document.getElementById('welcome-text').innerText = `Halo, ${myName}!`;
         }
+
+        function logout() { localStorage.clear(); location.reload(); }
 
         function createRoom() { socket.emit('create-room', { playerName: myName }); }
         
         function joinByCode() {
             const code = prompt("Masukkan Kode Room:");
-            if(code) socket.emit('join-room', { playerName: myName, roomCode: code.toUpperCase() });
+            if (code) socket.emit('join-room', { playerName: myName, roomCode: code.toUpperCase() });
         }
 
         function joinRoom(code) { socket.emit('join-room', { playerName: myName, roomCode: code }); }
 
         function play(move) {
-            socket.emit('make-move', { roomCode: currentRoomCode, move });
+            socket.emit('make-move', { roomCode: currentRoom.code, move });
             document.querySelectorAll('.hand-btn').forEach(b => b.disabled = true);
-            document.getElementById('btn-'+move).classList.add('selected');
-            document.getElementById('move-info').innerText = "Kamu sudah memilih!";
+            document.getElementById('btn-' + move).classList.add('selected');
+            document.getElementById('status-text').innerText = "Tunggu lawan...";
         }
 
         function sendChat() {
-            const msg = document.getElementById('chat-msg').value;
-            if(!msg) return;
-            socket.emit('send-chat', { roomCode: currentRoomCode, message: msg, sender: myName });
-            document.getElementById('chat-msg').value = "";
+            const msg = document.getElementById('input-chat').value;
+            if (!msg) return;
+            socket.emit('send-chat', { roomCode: currentRoom.code, message: msg, sender: myName });
+            document.getElementById('input-chat').value = "";
         }
 
         socket.on('room-created', (room) => {
-            currentRoomCode = room.code;
-            document.getElementById('lobby-screen').classList.add('hidden');
-            document.getElementById('game-screen').classList.remove('hidden');
+            currentRoom = room;
+            openGame();
         });
 
         socket.on('player-joined', (room) => {
-            currentRoomCode = room.code;
-            document.getElementById('lobby-screen').classList.add('hidden');
-            document.getElementById('game-screen').classList.remove('hidden');
-            
+            currentRoom = room;
+            openGame();
             const opp = room.players.find(p => p.id !== socket.id);
-            if(opp) {
-                document.getElementById('opp-name').innerText = opp.name;
-                document.getElementById('status-pill').innerText = "Lawan sudah di room! Ayo pilih!";
+            if (opp) {
+                document.getElementById('name-opp').innerText = opp.name;
+                document.getElementById('game-pill').innerText = "SIAP MAIN!";
                 
-                // Admin Kick
-                if(socket.id === room.ownerId) {
-                    const admin = document.getElementById('admin-area');
-                    admin.classList.remove('hidden');
-                    admin.innerHTML = `<button onclick="kick('${opp.id}')" class="text-[10px] text-red-500 border border-red-100 px-3 py-1 rounded-full font-bold">KICK ${opp.name}</button>`;
+                // Admin Area
+                if (socket.id === room.ownerId) {
+                    const area = document.getElementById('admin-kick');
+                    area.classList.remove('hidden');
+                    area.innerHTML = `<button onclick="kick('${opp.id}')" class="text-[10px] text-red-500 font-bold border border-red-100 px-3 py-1 rounded-full">KICK LAWAN</button>`;
                 }
             }
         });
 
-        socket.on('opponent-has-moved', () => {
-            const pill = document.getElementById('status-pill');
-            pill.innerText = "LAWAN SUDAH MEMILIH!";
-            pill.className = "inline-block px-4 py-1 rounded-full bg-green-500 text-white text-xs font-bold mb-6";
+        socket.on('opponent-moved', () => {
+            const pill = document.getElementById('game-pill');
+            pill.innerText = "LAWAN SUDAH PILIH!";
+            pill.className = "inline-block px-4 py-1 rounded-full bg-green-500 text-white text-[10px] font-bold mb-6";
         });
 
         socket.on('game-result', ({ players }) => {
             const me = players.find(p => p.id === socket.id);
             const opp = players.find(p => p.id !== socket.id);
             
-            document.getElementById('my-score').innerText = me.score;
-            document.getElementById('opp-score').innerText = opp.score;
+            document.getElementById('score-me').innerText = me.score;
+            document.getElementById('score-opp').innerText = opp.score;
 
             setTimeout(() => {
-                const emoji = {rock:'✊', paper:'🖐️', scissors:'✌️'};
-                alert(`HASIL:\nKamu: ${emoji[me.move]}\nLawan: ${emoji[opp.move]}`);
+                const emo = { rock: '✊', paper: '🖐️', scissors: '✌️' };
+                alert(`Hasil:\nKamu: ${emo[me.move]}\nLawan: ${emo[opp.move]}`);
                 resetUI();
             }, 400);
         });
@@ -187,37 +189,45 @@
                 b.disabled = false;
                 b.classList.remove('selected');
             });
-            document.getElementById('move-info').innerText = "";
-            const pill = document.getElementById('status-pill');
-            pill.innerText = "Pilih Lagi!";
-            pill.className = "inline-block px-4 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold mb-6";
+            document.getElementById('status-text').innerText = "";
+            const pill = document.getElementById('game-pill');
+            pill.innerText = "Giliran Selanjutnya!";
+            pill.className = "inline-block px-4 py-1 rounded-full bg-slate-100 text-slate-500 text-[10px] font-bold mb-6";
         }
 
         socket.on('receive-chat', ({ message, sender }) => {
-            const content = document.getElementById('chat-content');
+            const box = document.getElementById('box-chat');
             const isMe = sender === myName;
-            content.innerHTML += `<div class="flex flex-col ${isMe ? 'items-end' : 'items-start'}">
-                <span class="text-[9px] text-slate-400 font-bold">${sender}</span>
-                <span class="${isMe ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700'} px-3 py-1 rounded-2xl max-w-[80%]">${message}</span>
-            </div>`;
-            content.scrollTop = content.scrollHeight;
+            box.innerHTML += `
+                <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'}">
+                    <span class="text-[9px] text-slate-400 font-bold">${sender}</span>
+                    <span class="px-3 py-1 rounded-xl ${isMe ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700'}">${message}</span>
+                </div>
+            `;
+            box.scrollTop = box.scrollHeight;
         });
 
         socket.on('update-room-list', (rooms) => {
-            const list = document.getElementById('room-list');
-            list.innerHTML = rooms.length ? "" : "<p class='text-xs text-slate-400'>Belum ada room publik...</p>";
+            const list = document.getElementById('list-rooms');
+            list.innerHTML = rooms.length ? "" : "<p class='text-xs text-slate-400'>Belum ada room publik aktif...</p>";
             rooms.forEach(r => {
-                list.innerHTML += `<div class="card p-4 flex justify-between items-center shadow-sm">
-                    <div class="font-bold text-sm text-indigo-600">${r.code} <span class="text-slate-300 text-[10px] ml-2">Host: ${r.players[0].name}</span></div>
-                    <button onclick="joinRoom('${r.code}')" class="text-xs bg-slate-900 text-white px-4 py-2 rounded-xl font-bold">GABUNG</button>
-                </div>`;
+                list.innerHTML += `
+                    <div class="card p-4 flex justify-between items-center shadow-sm">
+                        <div class="font-bold text-sm text-indigo-600">${r.code} <span class="text-slate-300 text-[10px] ml-2 font-normal">Host: ${r.players[0].name}</span></div>
+                        <button onclick="joinRoom('${r.code}')" class="text-xs bg-slate-900 text-white px-4 py-2 rounded-xl font-bold">GABUNG</button>
+                    </div>
+                `;
             });
         });
 
-        function kick(id) { socket.emit('kick-player', { roomCode: currentRoomCode, playerId: id }); }
-        socket.on('kicked', () => { alert("Kamu dikeluarkan dari room!"); location.reload(); });
-        function logout() { localStorage.clear(); location.reload(); }
-        socket.on('error-msg', (m) => alert(m));
+        function openGame() {
+            document.getElementById('screen-lobby').classList.add('hidden');
+            document.getElementById('screen-game').classList.remove('hidden');
+        }
+
+        function kick(id) { socket.emit('kick-player', { roomCode: currentRoom.code, playerId: id }); }
+        socket.on('kicked', () => { alert("Kamu di-kick!"); location.reload(); });
+        socket.on('error-msg', (msg) => alert(msg));
     </script>
 </body>
 </html>
