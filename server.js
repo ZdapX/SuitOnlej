@@ -7,7 +7,6 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  addTrailingSlash: false,
   cors: { origin: "*" }
 });
 
@@ -22,7 +21,6 @@ app.get('/', (req, res) => {
 let rooms = {};
 
 io.on('connection', (socket) => {
-  // Update list room saat ada orang baru konek
   socket.emit('update-room-list', Object.values(rooms).filter(r => r.players.length < 2));
 
   socket.on('create-room', ({ playerName }) => {
@@ -51,7 +49,7 @@ io.on('connection', (socket) => {
 
   socket.on('make-move', ({ roomCode, move }) => {
     const room = rooms[roomCode];
-    if (!room) return;
+    if (!room || room.players.length < 2) return;
 
     const player = room.players.find(p => p.id === socket.id);
     if (player) {
@@ -59,30 +57,20 @@ io.on('connection', (socket) => {
       socket.to(roomCode).emit('opponent-moved');
     }
 
-    // Cek jika kedua pemain sudah pilih
-    if (room.players.length === 2 && room.players[0].move && room.players[1].move) {
-      const p1 = room.players[0];
-      const p2 = room.players[1];
+    const p1 = room.players[0];
+    const p2 = room.players[1];
 
-      // Tentukan pemenang
+    if (p1.move && p2.move) {
       if (p1.move !== p2.move) {
-        if (
-          (p1.move === 'rock' && p2.move === 'scissors') ||
-          (p1.move === 'paper' && p2.move === 'rock') ||
-          (p1.move === 'scissors' && p2.move === 'paper')
-        ) {
+        if ((p1.move === 'rock' && p2.move === 'scissors') || (p1.move === 'paper' && p2.move === 'rock') || (p1.move === 'scissors' && p2.move === 'paper')) {
           p1.score++;
         } else {
           p2.score++;
         }
       }
-
-      // Kirim hasil ke semua di room
       io.to(roomCode).emit('game-result', { players: room.players });
-
-      // Reset move untuk ronde berikutnya
-      room.players[0].move = null;
-      room.players[1].move = null;
+      p1.move = null;
+      p2.move = null;
     }
   });
 
@@ -105,12 +93,8 @@ io.on('connection', (socket) => {
       const pIdx = room.players.findIndex(p => p.id === socket.id);
       if (pIdx !== -1) {
         room.players.splice(pIdx, 1);
-        if (room.players.length === 0) {
-          delete rooms[code];
-        } else {
-          if (room.ownerId === socket.id) room.ownerId = room.players[0].id;
-          io.to(code).emit('player-joined', room);
-        }
+        if (room.players.length === 0) delete rooms[code];
+        else io.to(code).emit('player-joined', room);
       }
     }
     io.emit('update-room-list', Object.values(rooms).filter(r => r.players.length < 2));
@@ -118,6 +102,6 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server jalan di port ${PORT}`));
+server.listen(PORT, () => console.log(`Server on ${PORT}`));
 
 module.exports = app;
